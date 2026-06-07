@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authorise Access — {{ company_name }} SSO</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <div class="company-lockup">
+          <span class="shield-icon">&#128737;</span>
+          <h1 class="company-name">{{ company_name }}</h1>
+        </div>
+        <p class="subtitle">Authorise Access</p>
+      </div>
+
+      <div class="consent-info">
+        <div class="signed-in-as">
+          Signed in as <strong>{{ user.name }}</strong><br>
+          <span style="font-size:13px;color:#9ca3af;">{{ user.email }}</span>
+        </div>
+
+        <div class="permissions-box">
+          <div class="permissions-header">
+            <strong>{{ client_id }}</strong> is requesting access to:
+          </div>
+          <div class="permissions-list">
+            <div class="permission-item">View your email address</div>
+            <div class="permission-item">View your display name</div>
+            <div class="permission-item">View your profile information</div>
+          </div>
+        </div>
+      </div>
+
+      <form method="POST" action="{{ url_for('consent') }}">
+        <input type="hidden" name="client_id" value="{{ client_id }}">
+        <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+        <input type="hidden" name="scope" value="{{ scope }}">
+        <input type="hidden" name="state" value="{{ state or '' }}">
+        <input type="hidden" name="nonce" value="{{ nonce or '' }}">
+
+        <div class="btn-group">
+          <button type="submit" name="action" value="deny" class="btn btn-secondary">Deny</button>
+          <button type="submit" name="action" value="allow" class="btn">Allow</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</body>
+</html>

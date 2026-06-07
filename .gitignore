@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.db
+sso/keys/private_key.pem
+.env

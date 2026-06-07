@@ -1,0 +1,739 @@
+================================================================================
+                    CRASH COURSE V2 — Wissen Technology SSO Demo 2
+================================================================================
+
+TABLE OF CONTENTS
+  1. Complete Project Idea
+  2. What Changed From V1 (Key Differentiators)
+  3. Type of SSO Used
+  4. How We Used It (Step by Step — New Flow)
+  5. Features
+  6. Packages Used and What They Are
+  7. Use Cases of Each Package
+  8. Project Architecture (V2 Structure)
+  9. OIDC Protocol Flow (Detailed — V2 Version)
+  10. API Endpoints Reference
+  11. Token Lifecycle
+  12. Database Schema (Shared with V1)
+  13. Authentication Logic (Decision Tree)
+  14. SSO Session Logic
+  15. Error Messages Reference
+  16. Key Design Decisions
+  17. How to Run
+  18. Customization Guide
+
+
+================================================================================
+1. COMPLETE PROJECT IDEA
+================================================================================
+
+Wissen SSO Demo V2 is a refined version of the original SSO demo. The core
+concept is the same — demonstrate OpenID Connect Single Sign-On with Wissen
+Technology as the identity provider — but the user experience is redesigned.
+
+The key insight behind V2: instead of a generic "Sign In" button that takes you
+to a dashboard, the landing page IS the app launcher. Users see the three
+applications (Zoho Workplace, Microsoft Teams, Slack) immediately and click
+whichever one they want to use. The SSO authentication happens seamlessly in
+the background when they click an app.
+
+This mirrors the real-world experience of enterprise portals like Google
+Workspace or Microsoft 365, where you see your apps first and only get
+prompted for credentials when you try to launch one.
+
+The system reuses the same database from V1 (employees.db) so all existing
+employee records are shared. The SSO provider code is also largely the same,
+but the client app has been completely rewritten for the new app-first flow.
+
+
+================================================================================
+2. WHAT CHANGED FROM V1 (KEY DIFFERENTIATORS)
+================================================================================
+
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │                  V1 (wissen-sso-demo)          VS      V2 (demo-2)      │
+  ├─────────────────────────────────────────────────────────────────────────┤
+  │ Landing page: Sign In button                   3-app card grid          │
+  │ Flow: Sign In → SSO → Dashboard → App          Click app → SSO → App   │
+  │ Dashboard: Separate page                        No dashboard (apps =    │
+  │              with apps grid                      landing page itself)   │
+  │ App selection: After login                       Before login            │
+  │ Pending app: Not tracked                        Tracked via session     │
+  │ Redirect after login: /dashboard                /apps/<app_id>          │
+  │ Password error: "Invalid password"              "Incorrect password"    │
+  │ DB ownership: Own local DB                      Shared with V1          │
+  │ DB init: DELETE + re-insert every time          IF NOT EXISTS + count   │
+  │ Auth check in /apps: redirect to /              redirect to /login?app= │
+  │ Template: home.html (generic welcome)           home.html (app grid)    │
+  └─────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+3. TYPE OF SSO USED
+================================================================================
+
+Same as V1: OpenID Connect (OIDC) Authorization Code flow.
+
+  OpenID Connect (OIDC):
+    - Industry standard protocol (built on OAuth 2.0)
+    - Adds authentication (verifying who you are) to OAuth 2.0's authorization
+      (what you can access)
+    - Used by: Okta, Azure Active Directory, Google Identity Platform,
+      Keycloak, Auth0, and most enterprise SSO systems
+
+  Authorization Code Flow:
+    - The browser is redirected to the SSO provider's login page
+    - User enters credentials DIRECTLY on the SSO page (client never sees them)
+    - SSO returns a one-time "authorization code" via the browser redirect
+    - Client exchanges this code for tokens using a server-side POST request
+      (includes the client_secret which is never exposed to the browser)
+    - This is considered the most secure OIDC flow
+
+
+================================================================================
+4. HOW WE USED IT (STEP BY STEP — NEW FLOW)
+================================================================================
+
+Step 1: User visits the portal at http://localhost:8001/
+        - Sees 3 app cards: Zoho Workplace, Microsoft Teams, Slack
+        - Each card has the app's branded color, icon, description
+        - Cards show "SSO enabled" status
+        - If NOT logged in: just the cards, no user info
+        - If logged in: user badge with name/email and Sign out link
+
+Step 2: User clicks an app (e.g. "Zoho Workplace")
+        - Browser navigates to /login?app=zoho
+        - Client checks: is user already logged in?
+          - YES → redirect directly to /apps/zoho (no login needed)
+          - NO  → proceed with OIDC flow
+
+Step 3: Client starts the OIDC flow
+        - Stores "pending_app = zoho" in the session
+        - Generates state (CSRF token) and nonce (replay protection)
+        - Redirects browser to:
+          http://localhost:8000/authorize?response_type=code&client_id=demo-client
+          &redirect_uri=http://localhost:8001/callback&scope=openid+profile+email
+          &state=<random>&nonce=<random>
+
+Step 4: SSO Provider shows the Wissen Technology login page
+        - Wissen-branded login form
+        - Title: "Sign In — Wissen Technology SSO"
+        - User enters their @wissen.com email and password
+
+Step 5: SSO validates credentials (3 checks):
+        1. Email ends with @wissen.com? → No → "Only @wissen.com email
+           addresses are allowed"
+        2. Email in employees table? → No → "This email is not registered
+           as a Wissen Technology employee"
+        3. Password matches? → No → "Incorrect password"
+        - All pass → Store user in SSO session → Show consent screen
+
+Step 6: User clicks "Allow" on the consent screen
+        - SSO generates a one-time authorization code
+        - Redirects back to: http://localhost:8001/callback?code=<code>&state=<state>
+
+Step 7: Client receives the callback
+        - Validates state matches session (CSRF protection)
+        - POSTs to SSO's /token endpoint (server-to-server):
+            grant_type=authorization_code
+            code=<code>
+            client_id=demo-client
+            client_secret=demo-secret
+            redirect_uri=http://localhost:8001/callback
+        - SSO returns: { access_token, id_token, token_type, expires_in, scope }
+
+Step 8: Client verifies the ID Token
+        - Fetches JWKS from SSO's /jwks.json
+        - Finds the matching key by "kid" (Key ID)
+        - Verifies the RS256 signature using the public key
+        - Decodes claims: name, email, preferred_username, etc.
+        - Falls back to unverified decoding if signature verification fails
+
+Step 9: Client stores user info and tokens in session
+        - Pops "pending_app" from session (was "zoho")
+        - Redirects to: /apps/zoho
+
+Step 10: App landing page renders
+         - Shows: "Signed in to Zoho Workplace"
+         - Displays user avatar, name, email
+         - "Open Zoho Workplace" button → links to the real app
+         - "Back to Employee Portal" → returns to the app grid
+         - Footer: "Authenticated via Wissen Technology SSO"
+
+Step 11: SSO in action
+         - User clicks "Back to Portal"
+         - Now on the home page — the user badge shows they're logged in
+         - User clicks "Microsoft Teams"
+         - /login?app=teams checks session → user IS logged in
+         - Redirects directly to /apps/teams (NO login prompt!)
+         - Similarly for Slack — all 3 apps open without re-authentication
+
+
+================================================================================
+5. FEATURES
+================================================================================
+
+  a) App-First Landing Page
+     - Users see the 3 app cards immediately on page load
+     - No separate login step — authentication happens on demand
+     - Cleaner, more intuitive UX
+
+  b) Context-Aware Authentication
+     - Which app the user clicked is tracked via "pending_app" in session
+     - After SSO callback, user is redirected to the SPECIFIC app they chose
+     - Not a generic dashboard
+
+  c) True SSO Experience
+     - Once authenticated via Wissen SSO, all 3 apps open without login
+     - If already logged in, clicking any app skips the entire OIDC flow
+     - Demonstrates the core value of Single Sign-On
+
+  d) Shared Database with V1
+     - Points to wissen-sso-demo/sso/employees.db
+     - No duplicate data, no synchronization needed
+     - Both V1 and V2 can run side by side with the same employee records
+
+  e) Non-Destructive Database Initialization
+     - CREATE TABLE IF NOT EXISTS (preserves existing data)
+     - Checks row count before inserting
+     - Only seeds data if the table is empty
+     - Does NOT delete existing records on every startup
+
+  f) Corrected Error Message
+     - Changed from "Invalid password" to "Incorrect password"
+     - More natural and user-friendly phrasing
+
+  g) App Validation in Routes
+     - /login validates that the app_id parameter matches an actual app
+     - Falls back to "zoho" if invalid or missing
+     - /apps/<id> returns 404 for unknown app IDs
+
+  h) Reuses All V1 Infrastructure
+     - Same SSO provider (sso/) with minor config changes
+     - Same RSA key pair for JWT signing
+     - Same OIDC endpoints, consent screen, token handling
+     - Same test employee accounts
+
+  i) Responsive Grid Layout
+     - 3-column desktop layout
+     - Single-column mobile layout (via media query)
+     - Glass-morphism card design (backdrop-filter with semi-transparent bg)
+     - Staggered card animations (each card fades in with a delay)
+
+
+================================================================================
+6. PACKAGES USED AND WHAT THEY ARE
+================================================================================
+
+Package: flask 3.0.0
+  What it is: Lightweight Python web framework
+  Used for: Both SSO provider and client app routing, session management,
+            template rendering (Jinja2), request/response handling
+  Why: Minimal setup, built-in development server, ideal for demos
+
+Package: pyjwt 2.8.0
+  What it is: Python JWT (JSON Web Token) library
+  Used for: Creating signed ID/Access tokens (SSO side), verifying token
+            signatures (client side), parsing JWKS (PyJWK class)
+  Why: Supports RS256 algorithm, JWK/JWKS, audience/issuer validation
+
+Package: cryptography 41.0.7
+  What it is: Cryptographic recipes and primitives
+  Used for: RSA 2048-bit key pair generation, PEM serialization,
+            public key extraction for JWK endpoint
+  Why: Industry-standard Python crypto library; PyJWT depends on it for
+       RS256 signing
+
+Package: requests 2.31.0
+  What it is: Python HTTP library
+  Used for: Server-to-server communication between client and SSO provider
+            (token exchange POST, JWKS GET)
+  Why: Simpler than urllib, handles form data and JSON parsing
+
+Package: sqlite3 (Python Standard Library)
+  What it is: Self-contained SQL database engine (built into Python)
+  Used for: Employee records storage and authentication queries
+  Why: Zero configuration, file-based, perfect for demos
+
+Package: secrets (Python Standard Library)
+  What it is: Cryptographically secure random generation
+  Used for: Authorization codes, state, nonce, Flask secret key
+  Why: OS-provided entropy, more secure than random module
+
+Package: base64 (Python Standard Library)
+  What it is: Binary-to-text encoding
+  Used for: URL-safe base64 encoding of RSA key components (n, e) for JWK
+  Why: Standard JWK format requirement
+
+Package: urllib.parse (Python Standard Library)
+  What it is: URL parsing and encoding
+  Used for: urlencode() for OIDC parameter encoding, quote() for error
+            message encoding in redirect URLs
+  Why: Prevents malformed URLs from unescaped characters (spaces in scope)
+
+
+================================================================================
+7. USE CASES OF EACH PACKAGE
+================================================================================
+
+flask:
+  - app = Flask(__name__) — creates the web application
+  - @app.route("/") — defines URL routes
+  - session["user"] — stores/retrieves authenticated user data
+  - render_template("home.html", ...) — renders Jinja2 templates
+  - redirect(url_for("...")) — URL generation and redirects
+  - request.args.get("app") — reads query parameters
+
+pyjwt:
+  - jwt.encode(payload, private_key, algorithm="RS256") — creates tokens
+  - jwt.decode(id_token, key, algorithms=["RS256"], audience=...) — verifies
+  - jwt.get_unverified_header(id_token) — reads header without verification
+  - jwt.PyJWK(key_data) — constructs verification key from JWKS
+
+cryptography:
+  - rsa.generate_private_key(public_exponent=65537, key_size=2048) — RSA gen
+  - serialization.load_pem_private_key() — reads stored private key
+  - private_key.public_key() — extracts public key from private key
+
+requests:
+  - requests.post(url, data={...}) — token exchange with SSO
+  - requests.get(url) — fetch JWKS from SSO
+  - resp.status_code — check HTTP response status
+  - resp.json() — parse JSON response
+
+sqlite3:
+  - sqlite3.connect(DB_PATH) — connect to database file
+  - conn.execute("SELECT ... WHERE email = ?", (email,)) — query
+  - cursor.fetchone() — get single result
+  - conn.execute("CREATE TABLE IF NOT EXISTS ...") — schema creation
+
+secrets:
+  - secrets.token_urlsafe(32) — 43-char cryptographically random string
+  - secrets.token_urlsafe(16) — 22-char random string for state/nonce
+  - secrets.token_hex(32) — 64-char random hex string (fallback secret key)
+
+base64:
+  - base64.urlsafe_b64encode(data) — URL-safe base64 encoding
+  - .rstrip(b"=") — remove padding for JWK standard format
+
+urllib.parse:
+  - urlencode(params) — dict → URL query string with proper encoding
+  - quote(text) — URL-encode a string for safe inclusion in redirect URL
+
+
+================================================================================
+8. PROJECT ARCHITECTURE (V2 STRUCTURE)
+================================================================================
+
+  wissen-sso-demo-2/
+  ├── sso/                          # SSO Identity Provider (PORT 8000)
+  │   ├── app.py                    #    OIDC endpoints (COPIED from V1)
+  │   ├── config.py                 #    DB_PATH → V1's employees.db
+  │   ├── init_db.py                #    Non-destructive DB init
+  │   ├── keys/                     #    RSA keys (COPIED from V1)
+  │   ├── static/
+  │   │   └── style.css             #    Shared styles (COPIED from V1)
+  │   └── templates/
+  │       ├── login.html            #    SSO login form (COPIED from V1)
+  │       ├── consent.html          #    OAuth consent screen (COPIED from V1)
+  │       └── access-denied.html    #    Error page (COPIED from V1)
+  ├── client/                       # Client App / Relying Party (PORT 8001)
+  │   ├── app.py                    #    NEW — App-first OIDC flow
+  │   └── templates/
+  │       ├── home.html             #    NEW — 3-app card grid landing page
+  │       └── app-landing.html      #    NEW — Per-app SSO landing page
+  ├── requirements.txt              # Python dependencies
+  ├── start.bat                     # Launches both servers
+  ├── start-sso.bat                 # Launches SSO only
+  └── start-client.bat              # Launches client only
+
+  Key architectural note:
+  The SSO provider code (sso/) is COPIED from V1 with 2 small changes:
+    1. config.py: DB_PATH points to V1's employees.db
+    2. init_db.py: Uses IF NOT EXISTS (doesn't overwrite V1 data)
+    3. app.py: Changed "Invalid password" → "Incorrect password"
+  Everything else in sso/ is identical to V1.
+
+  Architecture Diagram:
+
+    Browser ──► Client App (:8001) ──► SSO Provider (:8000) ──► V1's employees.db
+                   (Relying Party)        (Identity Provider)   (shared)
+
+
+================================================================================
+9. OIDC PROTOCOL FLOW (DETAILED — V2 VERSION)
+================================================================================
+
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║                    V2 FLOW DIAGRAM                              ║
+  ╠══════════════════════════════════════════════════════════════════╣
+  ║  User sees 3 apps → clicks "Zoho"                              ║
+  ║       │                                                         ║
+  ║       ├─ Already logged in? → YES → /apps/zoho (done!)         ║
+  ║       │                                                         ║
+  ║       └─ NO → Store pending_app = zoho                         ║
+  ║               → Generate state + nonce                          ║
+  ║               → Redirect to SSO: /authorize?<params>            ║
+  ║                                                                  ║
+  ║  SSO Login Form → User enters credentials                      ║
+  ║       │                                                         ║
+  ║       ├─ Wrong domain → /access-denied (address not allowed)    ║
+  ║       ├─ Not in DB   → /access-denied (not an employee)         ║
+  ║       ├─ Wrong pwd   → /access-denied (incorrect password)      ║
+  ║       │                                                         ║
+  ║       └─ VALID → Consent screen → "Allow"                      ║
+  ║                 → Auth code issued                              ║
+  ║                 → Redirect to /callback?code=<code>             ║
+  ║                                                                  ║
+  ║  Client /callback → Validate state                             ║
+  ║                   → POST /token (exchange code for JWTs)       ║
+  ║                   → Verify ID Token signature                   ║
+  ║                   → Store user in session                       ║
+  ║                   → Pop pending_app → redirect to /apps/zoho    ║
+  ║                                                                  ║
+  ║  /apps/zoho → User is in session → Show "Signed in to Zoho"    ║
+  ║                                                                  ║
+  ║  User returns to portal → clicks "Teams"                       ║
+  ║  → /login?app=teams → user IS in session                       ║
+  ║  → Redirect DIRECTLY to /apps/teams (no SSO!)                  ║
+  ╚══════════════════════════════════════════════════════════════════╝
+
+
+================================================================================
+10. API ENDPOINTS REFERENCE
+================================================================================
+
+SSO Provider (http://localhost:8000):
+  ─────────────────────────────────────────────────────────────────
+  Method  Path                                      Purpose
+  ─────────────────────────────────────────────────────────────────
+  GET     /.well-known/openid-configuration         OIDC discovery doc
+  GET     /authorize                                Show login form
+  POST    /authorize                                Validate credentials
+  POST    /consent                                  User approves/denies
+  POST    /token                                    Exchange code for JWTs
+  GET     /userinfo                                 User claims from token
+  GET     /jwks.json                                Public RSA key (JWK)
+  GET     /access-denied                            Error page
+  GET     /logout                                   Clear session
+  GET     /public-key                               RSA key in PEM format
+  ─────────────────────────────────────────────────────────────────
+
+Client App (http://localhost:8001):
+  ─────────────────────────────────────────────────────────────────
+  Method  Path                   Auth     Purpose
+  ─────────────────────────────────────────────────────────────────
+  GET     /                      None     Landing page (3 app cards)
+  GET     /login?app=<id>        None     Initiate OIDC for specific app
+  GET     /callback              None     Handle OIDC callback
+  GET     /apps/<id>             Session  Show app landing (zoho/teams/slack)
+  GET     /logout                None     Clear session → redirect to /
+  ─────────────────────────────────────────────────────────────────
+
+  Note: There is NO /dashboard route in V2. The home page IS the dashboard.
+  Apps are displayed on the landing page both before and after login.
+
+
+================================================================================
+11. TOKEN LIFECYCLE
+================================================================================
+
+Same as V1:
+
+ID Token (JWT, RS256-signed):
+  Payload: iss (issuer), sub (subject = email), aud (audience = client_id),
+           exp (expiry), iat (issued at), auth_time, email, email_verified,
+           name, preferred_username, nonce
+  Expiry: 3600 seconds (1 hour)
+  Purpose: Proves the user's identity to the client app
+
+Access Token (JWT, RS256-signed):
+  Payload: iss, sub, aud, exp, iat, scope, client_id, name
+  Expiry: 3600 seconds (1 hour)
+  Purpose: Authorizes API access on behalf of the user
+
+JWKS Endpoint (/jwks.json):
+  Returns: { keys: [{ kty: "RSA", n: "<base64>", e: "AQAB", alg: "RS256",
+                      use: "sig", kid: "wissen-sso-key-1" }] }
+  Purpose: Allows clients to verify token signatures
+
+Authorization Codes:
+  - One-time use, 5-minute expiry
+  - Stored in-memory (Python dict on the SSO process)
+  - Popped (deleted) immediately after use
+
+
+================================================================================
+12. DATABASE SCHEMA (SHARED WITH V1)
+================================================================================
+
+Shared database: wissen-sso-demo/sso/employees.db (NOT a copy)
+
+The V2 sso/config.py computes the path as:
+  V1_DIR = abspath(wissen-sso-demo-2/../wissen-sso-demo)
+  DB_PATH = V1_DIR + /sso/employees.db
+
+Schema (same as V1):
+  ─────────────────────────────────────────────────────────────
+  Column    Type      Constraints        Description
+  ─────────────────────────────────────────────────────────────
+  id        INTEGER   PRIMARY KEY AUTO   Auto-incrementing ID
+  name      TEXT      NOT NULL           Employee's full name
+  email     TEXT      NOT NULL UNIQUE    Employee's @wissen.com email
+  password  TEXT      NOT NULL           Plaintext password
+  ─────────────────────────────────────────────────────────────
+
+Seed Data (5 employees):
+  Shaila Pandya    shaila.pandya@wissen.com     shaila123
+  Rahul Pandey     rahul.pandey@wissen.com      rahul456
+  Nandini Sharma   nandini.sharma@wissen.com    nandini000
+  Krishna Kaushik  krishna.kaushik@wissen.com   krishna444
+  Aadya Billore    aadya.billore@wissen.com     aadya888
+
+V2 Database Behavior:
+  - On startup, checks if table exists (CREATE TABLE IF NOT EXISTS)
+  - Counts existing rows
+  - Only inserts seed data if table is empty (COUNT = 0)
+  - Does NOT delete existing records (V1's init_db.py does DELETE FROM)
+  - This allows V1 and V2 to share the database without conflicts
+
+
+================================================================================
+13. AUTHENTICATION LOGIC (DECISION TREE)
+================================================================================
+
+Same authentication logic as V1 (handled by SSO Provider):
+
+  User submits: email + password on the SSO login form
+
+  Step 1 — Domain check:
+     Does email end with "@wissen.com"?
+       NO  → /access-denied?reason=Only @wissen.com email addresses...
+       YES → Continue
+
+  Step 2 — Registration check:
+     Does email exist in employees table?
+       NO  → /access-denied?reason=This email is not registered...
+       YES → Continue
+
+  Step 3 — Password check:
+     Does password match stored value?
+       NO  → /access-denied?reason=Incorrect password
+       YES → SUCCESS → Set session → Show consent screen
+
+  Step 4 — Consent:
+     User clicks "Allow"  → Generate auth code → Redirect to callback
+     User clicks "Deny"   → Redirect to callback?error=access_denied
+
+
+================================================================================
+14. SSO SESSION LOGIC
+================================================================================
+
+This is the core of the V2 flow. The session management works as follows:
+
+  A) Before Authentication:
+     - The home page (/ ) checks if "user" is in the Flask session
+     - If NOT present: render unauthenticated view (3 app cards, no user info)
+     - If present: render authenticated view (3 app cards + user badge)
+
+  B) App Click Flow:
+     - /login?app=zoho route:
+       1. Validate app_id is a real app (zoho/teams/slack)
+       2. Check if "user" is in session
+          → YES: redirect directly to /apps/zoho (bypass SSO)
+          → NO:  store pending_app = "zoho", proceed to OIDC
+       3. Generate state + nonce, store in session
+       4. Redirect to SSO /authorize
+
+  C) After OIDC Callback:
+     - Validate state (CSRF check)
+     - Exchange code for tokens
+     - Verify ID token signature
+     - Store user info in session["user"]
+     - Pop pending_app from session
+     - Redirect to /apps/<pending_app>
+
+  D) App Landing Page:
+     - /apps/<id> route:
+       1. Check if "user" is in session
+          → NO: redirect to /login?app=<id> (which starts OIDC flow)
+          → YES: render app-landing.html with user info
+       2. Validate app_id is a real app (404 if not)
+
+  E) Logout:
+     - /logout route clears the Flask session
+     - Redirects to home page (unauthenticated view)
+     - The SSO session is NOT cleared (separate domain)
+
+  Key difference from V1:
+     V1's /apps/<id> redirected to / (home) if not authenticated.
+     V2's /apps/<id> redirects to /login?app=<id> which preserves
+     which app the user wanted and triggers the OIDC flow for that app.
+     This means the user always ends up at the app they originally clicked.
+
+
+================================================================================
+15. ERROR MESSAGES REFERENCE
+================================================================================
+
+  ─────────────────────────────────────────────────────────────────
+  Scenario                 Page          Error Message
+  ─────────────────────────────────────────────────────────────────
+  Wrong email domain       /access-denied  "Only @wissen.com email
+                                           addresses are allowed"
+  Email not in database    /access-denied  "This email is not registered
+                                           as a Wissen Technology employee"
+  Wrong password           /access-denied  "Incorrect password"
+  Missing client_id        400 (plain)     "Missing client_id"
+  Invalid client_id        400 (plain)     "Invalid client"
+  Bad redirect_uri         400 (plain)     "Invalid redirect_uri"
+  State mismatch           400 (plain)     "State mismatch - possible CSRF"
+  Invalid auth code        400 (JSON)      {"error": "invalid_grant"}
+  Token exchange fails     400 (plain)     "Token exchange failed: ..."
+  Unknown app ID           404 (plain)     "App not found"
+  User denies consent      callback        error=access_denied
+  ─────────────────────────────────────────────────────────────────
+
+  V1 vs V2 difference:
+    V1: Wrong password → "Invalid password"
+    V2: Wrong password → "Incorrect password"
+
+
+================================================================================
+16. KEY DESIGN DECISIONS
+================================================================================
+
+  a) App-First UX
+     - Users see applications immediately, not a generic welcome page
+     - Authentication happens on demand when an app is clicked
+     - This mirrors real enterprise portals (Google Workspace, M365)
+     - Reduces friction: users can directly interact with what they want
+
+  b) Pending App Tracking
+     - The specific app the user clicked is stored in the session
+     - After SSO, the user is returned to that exact app
+     - Not a generic dashboard — context is preserved
+     - Implemented via session["pending_app"] = app_id
+
+  c) Session-Aware App Launching
+     - /apps/<id> checks authentication status
+     - If not authenticated: redirects to /login?app=<id> (not just /)
+     - This ensures the app parameter is preserved in the URL
+     - The user doesn't lose context
+
+  d) Shared Database (Backward Compatible)
+     - Points to V1's employees.db instead of creating a new one
+     - V2's init_db.py uses non-destructive logic (won't overwrite V1 data)
+     - Both V1 and V2 can coexist with the same employee records
+     - No data duplication
+
+  e) Glass-Morphism UI
+     - Semi-transparent app cards with backdrop-filter blur
+     - Creates a modern, premium feel on the dark gradient background
+     - Cards have staggered fade-in animations
+     - Responsive: 3 columns on desktop, 1 column on mobile
+
+  f) No Separate Dashboard
+     - V1 had: home → SSO → dashboard → app
+     - V2 has: home (with apps) → SSO → app (same page as home)
+     - The app grid is both the landing page AND the dashboard
+     - After login, user badge appears on the same page
+     - Simpler, fewer pages, less navigation
+
+  g) Error Message Polish
+     - "Invalid password" → "Incorrect password"
+     - More natural, less technical phrasing
+     - Better user experience for non-technical demo viewers
+
+  h) SSO Provider Unchanged
+     - The entire sso/ directory is copied from V1
+     - Only 3 small changes: DB_PATH, init_db logic, error message
+     - This proves the same SSO infrastructure works with different UX
+     - The OIDC endpoints, token handling, key management are identical
+
+
+================================================================================
+17. HOW TO RUN
+================================================================================
+
+Prerequisites:
+  - Python 3.8+
+  - pip installed
+  - wissen-sso-demo must exist (V2 shares its database)
+
+Step 1: Install dependencies
+  cd wissen-sso-demo-2
+  pip install -r requirements.txt
+
+Step 2: Start both servers
+  Option A — Double-click: start.bat
+  Option B — Two terminals:
+
+    Terminal 1:
+      set FLASK_PORT=8000
+      set FLASK_SECRET_KEY=sso-secret-demo
+      py -m sso.app
+
+    Terminal 2:
+      set FLASK_PORT=8001
+      set CLIENT_PUBLIC_URL=http://localhost:8001
+      set SSO_PUBLIC_URL=http://localhost:8000
+      set SSO_INTERNAL_URL=http://localhost:8000
+      set FLASK_SECRET_KEY=client-secret-demo
+      py -m client.app
+
+Step 3: Open http://localhost:8001 in your browser
+
+Step 4: Click any app card to start the SSO flow
+
+Step 5: Test with these credentials:
+  Email: shaila.pandya@wissen.com
+  Password: shaila123
+
+Step 6: Test error scenarios:
+  - Try user@gmail.com → "Only @wissen.com email addresses are allowed"
+  - Try random@wissen.com → "not registered"
+  - Try shaila.pandya@wissen.com + wrong password → "Incorrect password"
+
+
+================================================================================
+18. CUSTOMIZATION GUIDE
+================================================================================
+
+Add Employees:
+  Edit wissen-sso-demo/sso/init_db.py (V1's file)
+  Since V2 shares V1's database, changes to employees go through V1
+
+Change Company Name:
+  Edit sso/config.py in EITHER project (they're independent)
+  Change COMPANY_NAME variable
+
+Change Email Domain:
+  Edit sso/config.py → change ALLOWED_EMAIL_DOMAIN
+
+Add New App to Portal:
+  Edit client/app.py:
+    1. Add to APPS list at the top
+    2. Add a new <a> card in home.html template
+  App info format: {id, name, color, url}
+
+Register New OIDC Client:
+  Edit sso/config.py → add to CLIENTS dict
+  Currently only "demo-client" is registered
+
+Rotate Signing Keys:
+  Delete sso/keys/ directory → restart server
+  Both V1 and V2 have their own key directories
+
+Change App Card Colors:
+  Edit the "color" field in the APPS list in client/app.py
+  Each app has its own hex color for branding
+
+Customize Error Messages:
+  Edit sso/app.py → look for the redirect() calls with "reason="
+  Each failure case has its own message string
+
+================================================================================
+                        END OF CRASH COURSE V2
+================================================================================

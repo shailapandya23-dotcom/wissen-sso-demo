@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Access Denied — {{ company_name }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="card" style="text-align:center;">
+      <div class="denied-icon">&#128274;</div>
+
+      <div class="header" style="margin-bottom:20px;">
+        <h1 class="company-name">{{ company_name }}</h1>
+        <p class="subtitle">Access Denied</p>
+      </div>
+
+      <div class="denied-reason">{{ reason }}</div>
+
+      <a href="http://localhost:8000/authorize?client_id=demo-client&redirect_uri=http://localhost:8001/callback&response_type=code&scope=openid+profile+email" class="btn">Try Again</a>
+
+      <p class="denied-footer">
+        Only Wissen Technology employees with registered @wissen.com<br>
+        accounts can access this system.
+      </p>
+    </div>
+  </div>
+</body>
+</html>
