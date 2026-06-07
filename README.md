@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Wissen Technology SSO Demo
 
 A single sign-on (SSO) demo built with Flask and OpenID Connect, featuring
@@ -52,3 +53,6 @@ Only `@wissen.com` email addresses are allowed.
 - **Cryptography** — RSA key generation and JWKS
 - **SQLite** — Employee database
 - **OpenID Connect** — Authorization code flow
+=======
+# wissen-sso-demo
+>>>>>>> d43b9e06c8a18da7eb95741c5853b361af73184b
