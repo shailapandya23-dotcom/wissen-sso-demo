@@ -26,7 +26,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 
 PORT = int(os.environ.get("FLASK_PORT", 8000))
-ISSUER = f"http://localhost:{PORT}"
+ISSUER = os.environ.get("SSO_ISSUER_URL", f"http://localhost:{PORT}")
 
 KEYS_DIR = os.path.join(os.path.dirname(__file__), "keys")
 os.makedirs(KEYS_DIR, exist_ok=True)

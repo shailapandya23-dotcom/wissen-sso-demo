@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: wissen-sso
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn sso.app:app
+    envVars:
+      - key: FLASK_PORT
+        value: 10000
+      - key: FLASK_SECRET_KEY
+        value: sso-secret-demo
+      - key: SSO_ISSUER_URL
+        value: https://wissen-sso.onrender.com
+      - key: PYTHON_VERSION
+        value: 3.11.0
+
+  - type: web
+    name: wissen-client
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn client.app:app
+    envVars:
+      - key: FLASK_PORT
+        value: 10000
+      - key: FLASK_SECRET_KEY
+        value: client-secret-demo
+      - key: CLIENT_PUBLIC_URL
+        value: https://wissen-client.onrender.com
+      - key: SSO_PUBLIC_URL
+        value: https://wissen-sso.onrender.com
+      - key: SSO_INTERNAL_URL
+        value: https://wissen-sso.onrender.com
+      - key: REDIRECT_URIS
+        value: '["https://wissen-client.onrender.com/callback"]'
+      - key: PYTHON_VERSION
+        value: 3.11.0
