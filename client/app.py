@@ -10,10 +10,10 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 
 CLIENT_PORT = int(os.environ.get("FLASK_PORT", 8001))
-CLIENT_PUBLIC_URL = os.environ.get("CLIENT_PUBLIC_URL", f"http://localhost:{CLIENT_PORT}")
+CLIENT_PUBLIC_URL = os.environ.get("CLIENT_PUBLIC_URL", f"http://localhost:{CLIENT_PORT}").strip()
 
-SSO_PUBLIC_URL = os.environ.get("SSO_PUBLIC_URL", "http://localhost:8000")
-SSO_INTERNAL_URL = os.environ.get("SSO_INTERNAL_URL", "http://localhost:8000")
+SSO_PUBLIC_URL = os.environ.get("SSO_PUBLIC_URL", "http://localhost:8080").strip()
+SSO_INTERNAL_URL = os.environ.get("SSO_INTERNAL_URL", "http://localhost:8080").strip()
 
 CLIENT_ID = "demo-client"
 CLIENT_SECRET = "demo-secret"
@@ -87,7 +87,7 @@ def callback():
 
     nonce = session.pop("oauth_nonce", None)
 
-    resp = requests.post(f"{SSO_INTERNAL_URL}/token", data={
+    resp = requests.post(f"{SSO_INTERNAL_URL}/token", timeout=10, data={
         "grant_type": "authorization_code",
         "code": code,
         "redirect_uri": f"{CLIENT_PUBLIC_URL}/callback",
@@ -103,7 +103,7 @@ def callback():
 
     verification_note = None
     try:
-        jwks_resp = requests.get(f"{SSO_INTERNAL_URL}/jwks.json")
+        jwks_resp = requests.get(f"{SSO_INTERNAL_URL}/jwks.json", timeout=10)
         jwks = jwks_resp.json()
         unverified_headers = jwt.get_unverified_header(id_token)
         kid = unverified_headers.get("kid")
@@ -167,4 +167,4 @@ def logout():
 
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
-    app.run(host="0.0.0.0", port=CLIENT_PORT, debug=debug_mode)
+    app.run(host="0.0.0.0", port=CLIENT_PORT, debug=debug_mode, threaded=True)

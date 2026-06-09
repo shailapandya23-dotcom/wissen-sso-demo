@@ -25,8 +25,8 @@ from .config import (
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", secrets.token_hex(32))
 
-PORT = int(os.environ.get("FLASK_PORT", 8000))
-ISSUER = os.environ.get("SSO_ISSUER_URL", f"http://localhost:{PORT}")
+PORT = int(os.environ.get("FLASK_PORT", "8080").strip())
+ISSUER = os.environ.get("SSO_ISSUER_URL", f"http://localhost:{PORT}").strip()
 
 KEYS_DIR = os.path.join(os.path.dirname(__file__), "keys")
 os.makedirs(KEYS_DIR, exist_ok=True)
@@ -400,4 +400,4 @@ def public_key_endpoint():
 
 if __name__ == "__main__":
     debug_mode = os.environ.get("FLASK_DEBUG", "").lower() in ("1", "true", "yes")
-    app.run(host="0.0.0.0", port=PORT, debug=debug_mode)
+    app.run(host="0.0.0.0", port=PORT, debug=debug_mode, threaded=True)
