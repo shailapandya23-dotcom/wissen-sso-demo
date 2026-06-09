@@ -4,4 +4,5 @@ __pycache__/
 *.log
 *.db
 sso/keys/private_key.pem
+keys/private_key.pem
 .env

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In — {{ company_name }} SSO</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <div class="company-lockup">
+          <span class="shield-icon">&#128737;</span>
+          <h1 class="company-name">{{ company_name }}</h1>
+        </div>
+        <p class="subtitle">Single Sign-On</p>
+      </div>
+
+      {% if error %}
+      <div class="error-banner">{{ error }}</div>
+      {% endif %}
+
+      <form method="POST" action="{{ url_for('authorize') }}" id="login-form">
+        <input type="hidden" name="client_id" value="{{ client_id }}">
+        <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+        <input type="hidden" name="response_type" value="code">
+        <input type="hidden" name="scope" value="{{ scope }}">
+        <input type="hidden" name="state" value="{{ state or '' }}">
+        <input type="hidden" name="nonce" value="{{ nonce or '' }}">
+
+        <div class="field">
+          <label for="email">Email address</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            placeholder="you@wissen.com"
+            required
+            autofocus
+            autocomplete="email"
+          />
+          <span class="hint">Must be a @wissen.com address</span>
+        </div>
+
+        <div class="field">
+          <label for="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Enter your password"
+            required
+            autocomplete="current-password"
+          />
+        </div>
+
+        <button type="submit" class="btn" id="submit-btn">Sign In</button>
+      </form>
+
+      <p class="footer-text">
+        Authorised Wissen Technology employees only<br>
+        Unauthorised access is prohibited
+      </p>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('login-form').addEventListener('submit', function() {
+      var btn = document.getElementById('submit-btn');
+      btn.classList.add('btn-loading');
+      btn.disabled = true;
+    });
+  </script>
+</body>
+</html>

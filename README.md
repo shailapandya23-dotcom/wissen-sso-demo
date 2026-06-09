@@ -1,40 +1,45 @@
-<<<<<<< HEAD
 # Wissen Technology SSO Demo
 
-A single sign-on (SSO) demo built with Flask and OpenID Connect, featuring
-an SSO Provider and a Client Portal with employee authentication.
+[![Live Demo](https://img.shields.io/badge/demo-live-brightgreen)](https://shailapandya.pythonanywhere.com)
 
-## Architecture
+Single Flask app with SSO Provider + Client Portal merged into one deployable unit.
 
-```
-SSO Provider  (port 8000)  -  Handles login, consent, token & userinfo endpoints
-Client Portal (port 8001)  -  Protects app resources via OIDC authorization code flow
-```
+**Live demo:** https://shailapandya.pythonanywhere.com
 
-## Setup
+## Run Locally
 
 ```bash
 pip install -r requirements.txt
+python app.py
 ```
 
-## How to Run
+Open http://localhost:8080
 
-**Both servers** (recommended):
-```
-start.bat
-```
+## Deploy on PythonAnywhere (free, no credit card)
 
-**Individually:**
-```
-start-sso.bat    # SSO Provider on http://localhost:8000
-start-client.bat # Client Portal on http://localhost:8001
-```
-
-Open `http://localhost:8001` in your browser.
+1. Create an account at https://www.pythonanywhere.com
+2. Open a **Bash console** and clone/upload this repo
+3. Create a **Web app** via the dashboard:
+   - Manual configuration → Python 3.11 → Flask
+4. In the **Web** tab, set:
+   - **Source code**: `/home/YOUR_USERNAME/wissen-sso-demo-2`
+   - **Working directory**: `/home/YOUR_USERNAME/wissen-sso-demo-2`
+   - **WSGI file**: edit it to:
+     ```python
+     import sys
+     sys.path.insert(0, '/home/YOUR_USERNAME/wissen-sso-demo-2')
+     from app import app as application
+     ```
+5. In the **Web** tab → **Environment variables**, add:
+   | Variable | Value |
+   |---|---|
+    | `BASE_URL` | `https://shailapandya.pythonanywhere.com` |
+    | `FLASK_SECRET_KEY` | `pick-a-random-secret` |
+    | `FLASK_PORT` | `8080` |
+    | `REDIRECT_URIS` | `["https://shailapandya.pythonanywhere.com/callback"]` |
+6. **Reload** the web app.
 
 ## Default Employees
-
-The database is auto-seeded on first run with these test accounts:
 
 | Name | Email | Password |
 |---|---|---|
@@ -45,14 +50,3 @@ The database is auto-seeded on first run with these test accounts:
 | Aadya Billore | aadya.billore@wissen.com | aadya888 |
 
 Only `@wissen.com` email addresses are allowed.
-
-## Tech Stack
-
-- **Flask** — Web framework
-- **PyJWT** — JWT encoding / decoding
-- **Cryptography** — RSA key generation and JWKS
-- **SQLite** — Employee database
-- **OpenID Connect** — Authorization code flow
-=======
-# wissen-sso-demo
->>>>>>> d43b9e06c8a18da7eb95741c5853b361af73184b

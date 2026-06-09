@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Employee Portal — {{ company_name }}</title>
+  <style>
+    :root {
+      --navy: #0a1628;
+      --navy-light: #1a2a4a;
+      --blue: #2563eb;
+      --blue-hover: #1d4ed8;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-900: #111827;
+      --white: #ffffff;
+      --radius-md: 10px;
+      --radius-lg: 16px;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { -webkit-font-smoothing: antialiased; }
+
+    body {
+      font-family: var(--font-sans);
+      background: linear-gradient(135deg, var(--navy) 0%, var(--navy-light) 50%, #0d2137 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--gray-900);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .container {
+      max-width: 720px;
+      width: 100%;
+      margin: 20px;
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    .header-card {
+      background: var(--white);
+      border-radius: var(--radius-lg);
+      padding: 40px 36px;
+      text-align: center;
+      margin-bottom: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    }
+
+    .shield {
+      width: 56px;
+      height: 56px;
+      background: #eef2ff;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      font-size: 28px;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--navy);
+      letter-spacing: -0.3px;
+      margin-bottom: 4px;
+    }
+
+    .company-tag {
+      display: inline-block;
+      font-size: 12px;
+      color: var(--gray-500);
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: var(--gray-500);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .user-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      border-radius: 100px;
+      padding: 8px 18px 8px 8px;
+      font-size: 13px;
+    }
+
+    .user-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--blue);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .apps-section {
+      margin-top: 0;
+    }
+
+    .apps-label {
+      color: #93c5fd;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-weight: 600;
+      margin-bottom: 14px;
+      padding-left: 4px;
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .app-card {
+      background: rgba(255,255,255,0.06);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: var(--radius-lg);
+      padding: 28px 20px;
+      text-align: center;
+      text-decoration: none;
+      transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
+      animation: cardIn 0.5s ease-out backwards;
+      cursor: pointer;
+      display: block;
+    }
+
+    .app-card:nth-child(1) { animation-delay: 0.1s; }
+    .app-card:nth-child(2) { animation-delay: 0.2s; }
+    .app-card:nth-child(3) { animation-delay: 0.3s; }
+
+    .app-card:hover {
+      transform: translateY(-6px);
+      background: rgba(255,255,255,0.1);
+      box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+    }
+
+    .app-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      font-weight: 700;
+      color: white;
+      margin: 0 auto 14px;
+    }
+
+    .app-card h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: white;
+      margin-bottom: 4px;
+    }
+
+    .app-card p {
+      font-size: 12px;
+      color: rgba(255,255,255,0.5);
+      line-height: 1.4;
+    }
+
+    .app-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 12px;
+      font-size: 10px;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .app-status-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: #059669;
+      display: inline-block;
+    }
+
+    .footer-note {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 12px;
+      color: rgba(255,255,255,0.35);
+    }
+
+    .logout-link {
+      color: #93c5fd;
+      text-decoration: none;
+      font-size: 13px;
+      margin-left: 12px;
+      font-weight: 500;
+    }
+
+    .logout-link:hover {
+      text-decoration: underline;
+      color: white;
+    }
+
+    @media (max-width: 600px) {
+      .app-grid { grid-template-columns: 1fr; }
+      .header-card { padding: 28px 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-card">
+      <div class="shield">&#128737;</div>
+      <h1>Welcome{% if authenticated %}, {{ user.name }}{% endif %}</h1>
+      <p class="company-tag">Wissen Technology — Employee Portal</p>
+      <p class="subtitle">
+        {% if authenticated %}
+          You are signed in. Select an application to launch it via SSO.
+        {% else %}
+          Select an application below to sign in with your Wissen Technology SSO account.
+        {% endif %}
+      </p>
+      {% if authenticated %}
+      <div class="user-badge">
+        <div class="user-avatar">{{ user.name[0] }}</div>
+        <span>{{ user.email }}</span>
+        <a href="{{ url_for('logout') }}" class="logout-link">Sign out</a>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="apps-section">
+      <div class="apps-label">&#128218; Applications</div>
+      <div class="app-grid">
+        {% for app in apps %}
+        <a href="{{ url_for('login', app=app.id) }}" class="app-card">
+          <div class="app-icon" style="background:{{ app.color }};">{{ app.name[0] }}</div>
+          <h3>{{ app.name }}</h3>
+          <p>
+            {% if app.id == 'zoho' %}Email, calendar, docs &amp; collaboration suite
+            {% elif app.id == 'teams' %}Chat, meetings &amp; team collaboration
+            {% else %}Messaging, channels &amp; workflow automation{% endif %}
+          </p>
+          <div class="app-status"><span class="app-status-dot"></span> SSO enabled</div>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <p class="footer-note">Authorised employees only &middot; Wissen Technology</p>
+  </div>
+</body>
+</html>
